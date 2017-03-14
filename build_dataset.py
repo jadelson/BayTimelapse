@@ -3,7 +3,6 @@
 """
 Created on Sun Jan 29 19:05:44 2017
 
-@author: jadelson
 """
 
 # Import libraries
@@ -214,7 +213,9 @@ def simple_sfbay_windterp(x_stations, y_stations, u_stations, v_stations, \
 #    indx = indx &(umag<20 )
     indx = indx & ((lat6-lat5)*(x2 - lon5) <= (lon6-lon5)*(y2 - lat5))
     indx = indx & (x2 < lon7) 
-    indx = indx & ((x2 > lon_mont_min) & (x2 < lon_mont_max) & (y2 > lat_mont_min) & (y2 < lat_mont_max))
+    
+    #This following line EXCLUDES Montezuma slough
+    indx = indx & ~((x2 > lon_mont_min) & (x2 < lon_mont_max) & (y2 > lat_mont_min) & (y2 < lat_mont_max))
     
     u_wind = u2
     v_wind = v2
@@ -287,7 +288,8 @@ def calculate_stress(data):
         ky = -mag_k*np.sin(angle)
     
         A = a0/(np.sinh(mag_k*H))
-        Rew = A**2*omega/nu
+        
+        Rew = A**2*omega/nu +np.finfo(float).eps
         fw = 2*Rew**(-0.5)
         mag_tau_w = 0.5*rho*fw*(A*omega)**2
         tau_w_x = mag_tau_w*kx/mag_k
@@ -366,6 +368,7 @@ def stress_worker(filename, fetch_model):
         y.append(w['northing']) 
     
     u_wind, v_wind, umag_wind, indx = simple_sfbay_windterp(x,y,u,v,x2,y2,sat_tide_data['depth'])
+    
     wind_sat_tide_data = sat_tide_data
     wind_sat_tide_data['u_wind'] = u_wind
     wind_sat_tide_data['v_wind'] = v_wind
@@ -385,16 +388,17 @@ def stress_worker(filename, fetch_model):
         Ttemp, Hstemp = fetch_model.getwaveheight(np.array(x_0[i]), np.array(y_0[i]), np.array(theta[i]), np.array(u10_0[i]))
         T[i] = Ttemp[0]
         Hs[i] = Hstemp[0]
-    wind_sat_tide_data['theta'] = umag_wind
-
-
+    wind_sat_tide_data['theta'] = theta
     wind_sat_tide_data['easting'] = x_0
     wind_sat_tide_data['northin'] = y_0
     wind_sat_tide_data['T'] = T
     wind_sat_tide_data['a0'] = Hs
+    
+    
     indx2 = ~ np.isnan(Hs)
     
     for k in wind_sat_tide_data.keys():
+#        print(k, len(wind_sat_tide_data[k]))
         wind_sat_tide_data[k] = wind_sat_tide_data[k][indx2]
         
 #    # Save raw wind data without calculating stress for ease of future use
@@ -423,43 +427,44 @@ def sat_worker(filename):
     
     
 if __name__ == "__main__":
-    # Load tide model data (requires current velocities, water level, and depth)
-#    sat_inputs = os.listdir(sat_directory)
-#    sat_inputs = [k for k in sat_inputs if k.endswith('.nc')]
+#    # Load tide model data (requires current velocities, water level, and depth)
+#    sat_inputs = [k for k in os.listdir(sat_directory) if k.endswith('.nc')]
 #    results = Parallel(n_jobs=3)(delayed(sat_worker)(filename) for filename in sat_inputs)
    
     # Load results from the wave model (requires wave height, wave direction, wave period)
-    fetch_model = FetchModel()
-    if not os.path.isfile(wind_data_file): 
-        wind_station_data = fetch_model.downloadwinds(2014,2017)
-        fetch_model.savedata(wind_station_data,wind_data_file)
-    else:
-        wind_station_data = fetch_model.loadwindfromfile(wind_data_file)
-#     
-#              
+    fetch_file = 'savedfetchmodel.dk'
+    if os.path.isfile(fetch_file):
+        with open('savedfetchmodel.dk','rb') as f:
+           fetch_model = pickle.load(f)
+#    else:
+#        fetch_model = FetchModel()
+#        if not os.path.isfile(wind_data_file): 
+#            wind_station_data = fetch_model.downloadwinds(2014,2017)
+#            fetch_model.savedata(wind_station_data,wind_data_file)
+#        else:
+#            wind_station_data = fetch_model.loadwindfromfile(wind_data_file)    
+#    
     # we run the stress_worker fucntion for each satellite image we have 
     # downloaded that writes a full stress file dataset for each filename
     inputs = os.listdir(sat_tide_directory)
-    results = Parallel(n_jobs=3)(delayed(stress_worker)(filename, fetch_model) for filename in inputs)
-#    for i in inputs:
-#        fetches = stress_worker(i, fetch_model)
-#    stress_worker(filename, fetch_model)
-##                     
-#    full_data = {}
-#    full_data['date'] = np.array([])              
-#    for filename in os.listdir(stress_sat_directory):
-#        stress_sat_data = {}
-#        print(stress_sat_directory+filename)
-#        with open(stress_sat_directory+filename,'rb') as f:
-#            stress_sat_data = pickle.load(f)
-#            indx = ~ (np.isnan(stress_sat_data['tau']) | np.isinf(stress_sat_data['tau']))
-#            for k in stress_sat_data.keys():
-#                if not k in full_data.keys():
-#                    full_data[k] = np.array([])
-#                full_data[k] = np.append(full_data[k], stress_sat_data[k][indx])
-#            full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[16:31],'%Y%m%d_%H%M%S')]*sum(indx))
-#            f.close()
-            
-#    with open('/Users/jadelson/Dropbox/phdResearch/AllOptical/timelapse_work/full_dataset.dk','wb') as f:
-#        pickle.dump(full_data, f)
-    #    
+    results = Parallel(n_jobs=4)(delayed(stress_worker)(filename, fetch_model) for filename in inputs)
+#    stress_worker(inputs[2], fetch_model)
+#                     
+    full_data = {}
+    full_data['date'] = np.array([])              
+    for filename in os.listdir(stress_sat_directory):
+        stress_sat_data = {}
+        print(stress_sat_directory+filename)
+        with open(stress_sat_directory+filename,'rb') as f:
+            stress_sat_data = pickle.load(f)
+            indx = ~ (np.isnan(stress_sat_data['tau']) | np.isinf(stress_sat_data['tau']))
+            for k in stress_sat_data.keys():
+                if not k in full_data.keys():
+                    full_data[k] = np.array([])
+                full_data[k] = np.append(full_data[k], stress_sat_data[k][indx])
+            full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[16:31],'%Y%m%d_%H%M%S')]*sum(indx))
+            f.close()
+#            
+    with open('/Users/jadelson/Dropbox/phdResearch/AllOptical/timelapse_work/full_dataset.dk','wb') as f:
+        pickle.dump(full_data, f)
+#        
