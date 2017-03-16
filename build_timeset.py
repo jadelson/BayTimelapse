@@ -9,13 +9,10 @@ Created on Sun Jan 29 19:05:44 2017
 from datetime import datetime
 import netCDF4 as nc
 import os
-from calculate_fetch import FetchModel
-import utm
 from joblib import Parallel, delayed
 import numpy as np
 import pickle
 from get_coord import get_coord
-from scipy.optimize import minimize
 import build_dataset
 
 # Set directory locations
@@ -94,11 +91,11 @@ def write_sat_data(satnc, tide_data, date):
 
 
 def sat_worker(filename, tide_data):
-    model = nc.Dataset(sat_directory+filename)
+    model = nc.Dataset(raw_sat_directory+filename)
     if not tide_data == None:
         sat_tide_data = write_sat_data(model, tide_data, model.DATE+'_'+model.HOUR+model.MINUTE+model.SECOND[0:2])
         if not sat_tide_data == None:
-            print('Sat: ' + sat_directory+filename)
+            print('Sat: ' + raw_sat_directory+filename)
             print(len(tide_data['lat']), len(sat_tide_data['lat']))
     model.close()
     return    
@@ -107,7 +104,7 @@ if __name__ == "__main__":
     # Load tide model data (requires current velocities, water level, and depth)
     blank_date = datetime.strptime('20160301 18 30 00','%Y%m%d %H %M %S')        
     tide_data = build_dataset.find_tide_data_by_time(blank_date)
-    sat_inputs = [k for k in os.listdir(sat_directory) if k.endswith('.nc')]
+    sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
     sat_worker(sat_inputs[1], tide_data)
 #    results = Parallel(n_jobs=3)(delayed(sat_worker)(filename) for filename in sat_inputs)
 #   
