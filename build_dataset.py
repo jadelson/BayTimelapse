@@ -208,8 +208,8 @@ def simple_sfbay_windterp(x_stations, y_stations, u_stations, v_stations, \
 
     umag = np.hypot(u2, v2)
 
-    indx = (depth_grid < 50)
-    indx = indx & (~np.isnan(umag))
+#    indx = (depth_grid < 50)
+    indx = (~np.isnan(umag))
 #    indx = indx &(umag<20 )
     indx = indx & ((lat6-lat5)*(x2 - lon5) <= (lon6-lon5)*(y2 - lat5))
     indx = indx & (x2 < lon7) 
