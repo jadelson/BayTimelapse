@@ -18,11 +18,12 @@ from get_coord import get_coord
 from scipy.optimize import minimize
 
 # Set directory locations
-sat_directory = '/Volumes/Stella/landsat_order/landsat8_convert/'
-sat_tide_directory = '/Volumes/Stella/sat_and_rusty/'
-wind_sat_tide_directory = '/Volumes/Stella/wind_sat_and_rusty/'
-stress_sat_directory = '/Volumes/Stella/stress_sat/'
-wind_data_file = '/Volumes/Stella/weather_data/weather_data_2014-2017.dk'
+base_dir = '/Volumes/Stella/'
+sat_directory = base_dir + 'landsat_order/landsat8_convert/'
+sat_tide_directory = base_dir + 'sat_and_rusty/'
+wind_sat_tide_directory = base_dir + 'wind_sat_and_rusty/'
+stress_sat_directory = base_dir + 'stress_sat/'
+wind_data_file = base_dir + 'weather_data/weather_data_2014-2017.dk'
 fetch_file = 'cached_fetched.dk'
 
 ## Here are some functions!
@@ -89,8 +90,8 @@ def write_sat_data(satnc, tide_data, date):
 
 
 # This function extracts tidal data for a given time
-def find_tide_data_by_time(test_time): 
-    path = '/Volumes/Stella/raw_rusty_tides/' 
+def find_tide_data_by_time(test_time, path): 
+     
     base_time = datetime(2014,9,1,8,0) 
     ad_1 = datetime(1,1,1,8,0)
 
@@ -402,12 +403,12 @@ def stress_worker(filename, fetch_model):
         wind_sat_tide_data[k] = wind_sat_tide_data[k][indx2]
         
 #    # Save raw wind data without calculating stress for ease of future use
-#    with open('/Volumes/Stella/wind_sat_and_rusty/wind_sat_rusty_data_'+save_date+'.dk','wb') as g:
+#    with open(base_dir + 'wind_sat_and_rusty/wind_sat_rusty_data_'+save_date+'.dk','wb') as g:
 #        pickle.dump(wind_sat_tide_data,g)
 #        
     # Calculate the sat-stress database from tide and wave data then save
     stress_sat_data = calculate_stress(wind_sat_tide_data)
-    with open('/Volumes/Stella/stress_sat/stress_sat_data_'+save_date+'.dk','wb') as g:
+    with open(base_dir + 'stress_sat/stress_sat_data_'+save_date+'.dk','wb') as g:
         pickle.dump(stress_sat_data,g)     
 
     return filename      
@@ -416,7 +417,7 @@ def stress_worker(filename, fetch_model):
 def sat_worker(filename):
     model = nc.Dataset(sat_directory+filename)
     sat_date = datetime.strptime(model.DATE + ' '+ model.TIME[0:8],'%Y%m%d %H %M %S')        
-    tide_data = find_tide_data_by_time(sat_date)
+    tide_data = find_tide_data_by_time(sat_date, base_dir + 'raw_rusty_tides/')
     if not tide_data == None:
         sat_tide_data = write_sat_data(model, tide_data, model.DATE+model.HOUR+model.MINUTE+':'+model.SECOND[0:2])
         if not sat_tide_data == None:

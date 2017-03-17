@@ -112,13 +112,15 @@ def sat_worker(filename, tide_data):
     model.close()
     return combined_sat_data   
     
+
+
 if __name__ == "__main__":
     # Load tide model data (requires current velocities, water level, and depth)
     blank_date = datetime.strptime('20160301 18 30 00','%Y%m%d %H %M %S')        
-    tide_data = build_dataset.find_tide_data_by_time(blank_date)
+    tide_data = build_dataset.find_tide_data_by_time(blank_date, base_dir + 'raw_rusty_tides/')
     sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
-#    blah = sat_worker(sat_inputs[3], tide_data)
-    results = Parallel(n_jobs=4)(delayed(sat_worker)(filename, tide_data) for filename in sat_inputs)
+    blah = sat_worker(sat_inputs[3], tide_data)
+#    results = Parallel(n_jobs=4)(delayed(sat_worker)(filename, tide_data) for filename in sat_inputs)
 
 
 ##                     
