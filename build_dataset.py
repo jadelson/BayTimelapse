@@ -11,11 +11,12 @@ import netCDF4 as nc
 import os
 from calculate_fetch import FetchModel
 import utm
-from joblib import Parallel, delayed
+import multiprocessing
 import numpy as np
 import pickle
 from get_coord import get_coord
 from scipy.optimize import minimize
+import itertools
 from bay_remote_sensing_init import *
 
 #%%
@@ -74,9 +75,9 @@ def write_sat_data(satnc, tide_data, date):
     for k in final_data.keys():
         final_data[k] = np.asarray(final_data[k])
         
-    with open(sat_tide_directory+'sat_and_rusty_data_'+date+'.dk','wb') as f:
+    with open(sat_tide_directory+sat+'sat_tide_data_'+date+'.dk','wb') as f:
         pickle.dump(final_data,f)
-        print('Saved: ' + sat_tide_directory+'sat_and_rusty_data_'+date+'.dk')
+        print('Saved: ' + sat_tide_directory+sat+'sat_tide_data_'+date+'.dk')
     return final_data
 
 
@@ -318,9 +319,10 @@ def calculate_stress(data):
 # Calculate stress from wave and tide models at each point in the tidal model
 def stress_worker(filename, fetch_model):
     if not filename.endswith(".dk"): 
-        return 'FAIL ' + filename
-    print(filename)
-    # Extract date
+        print('FAIL ' + filename, flush=True)
+        return
+    print('Stress processing ' + filename + ' on CPU: ', str(multiprocessing.current_process()), flush=True)
+å    # Extract date
     date_string = filename[19:27]
     file_date = datetime.strptime(date_string,'%Y%m%d')
     satf = [s for s in os.listdir(sat_directory) if file_date.strftime('%Y%j') in s]
@@ -400,21 +402,21 @@ def stress_worker(filename, fetch_model):
 #        
     # Calculate the sat-stress database from tide and wave data then save
     stress_sat_data = calculate_stress(wind_sat_tide_data)
-    with open(base_dir + 'stress_sat/stress_sat_data_'+save_date+'.dk','wb') as g:
+    with open(stress_sat_directory+sat+'_stress_sat_data_'+save_date+'.dk','wb') as g:
         pickle.dump(stress_sat_data,g)     
 
     return filename      
 
 
 def sat_worker(filename):
+    print('Sat processing ' + filename + ' on CPU: ', str(multiprocessing.current_process()), flush=True)
     model = nc.Dataset(raw_sat_directory+filename)
     sat_date = datetime.strptime(model.DATE + ' '+ model.TIME[0:8],'%Y%m%d %H %M %S')        
     tide_data = find_tide_data_by_time(sat_date, base_dir + 'raw_rusty_tides/')
     if not tide_data == None:
-        sat_tide_data = write_sat_data(model, tide_data, model.DATE+model.HOUR+model.MINUTE+':'+model.SECOND[0:2])
+        sat_tide_data = write_sat_data(model, tide_data, model.DATE+model.HOUR+model.MINUTE+model.SECOND[0:2])
         if not sat_tide_data == None:
-            print('Sat: ' + sat_directory+filename)
-            print(len(tide_data['lat']), len(sat_tide_data['lat']))
+            print('Wrote sat: ' + sat_directory+filename)
     model.close()
     return(sat_date)
     
@@ -422,37 +424,50 @@ def sat_worker(filename):
     
 if __name__ == "__main__":
     # Load tide model data (requires current velocities, water level, and depth)
+    print('Begin building a full stress dataset for sat = '+sat, flush=True)
+    print('Starting: Merge satellite and tide data', flush=True)
     sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
-    jobs = []
-    for filename in sat_inputs:
-        p = multiprocessing.Process(target=sat_worker, args=(filename,))
-        jobs.append(p)
-        p.start()
-#    results = Parallel(n_jobs=3)(delayed(sat_worker)(filename) for filename in sat_inputs)
+    with multiprocessing.Pool() as p:
+        p.map(sat_worker, sat_inputs)
+        p.close()
+        p.join()
+    print('Finished: Merge satellite and tide data', flush=True)
+
    
     # Load results from the wave model (requires wave height, wave direction, wave period)
+    print('Starting: Retreiving fetch model', flush=True)
     if os.path.isfile(fetch_file):
         with open(fetch_file,'rb') as f:
            fetch_model = pickle.load(f)
     else:
         fetch_model = FetchModel()
         if not os.path.isfile(wind_data_file): 
-            wind_station_data = fetch_model.downloadwinds(2014,2017)
+            wind_station_data = fetch_model.downloadwinds(sat_start_date,2018)
             fetch_model.savedata(wind_station_data,wind_data_file)
         else:
-            wind_station_data = fetch_model.loadwindfromfile(wind_data_file)    
-#    
+            wind_station_data = fetch_model.loadwindfromfile(wind_data_file)   
+    print('Finished: Retreiving fetch model', flush=True) 
+    
     # we run the stress_worker fucntion for each satellite image we have 
     # downloaded that writes a full stress file dataset for each filename
-    inputs = os.listdir(sat_tide_directory)
-    results = Parallel(n_jobs=4)(delayed(stress_worker)(filename, fetch_model) for filename in inputs)
-#    stress_worker(inputs[2], fetch_model)
-#                     
+    print('Starting: Compiling satellite and stress data', flush=True)
+    stress_inputs = [k for k in os.listdir(sat_tide_directory) if k[0:2] == sat]
+    with multiprocessing.Pool() as p:
+        p.starmap(stress_worker, zip(stress_inputs, itertools.repeat(fetch_model)))
+        p.close()
+        p.join()
+    print('Finished: Compiling satellite and stress data', flush=True)
+
+#
+    print('Starting: Building full dataset', flush=True)
+                     
     full_data = {}
     full_data['date'] = np.array([])              
     for filename in os.listdir(stress_sat_directory):
+        if not filename[0:2] == sat:
+            continue
         stress_sat_data = {}
-        print(stress_sat_directory+filename)
+        print('grabbing: ' + stress_sat_directory+filename)
         with open(stress_sat_directory+filename,'rb') as f:
             stress_sat_data = pickle.load(f)
             indx = ~ (np.isnan(stress_sat_data['tau']) | np.isinf(stress_sat_data['tau']))
@@ -462,7 +477,11 @@ if __name__ == "__main__":
                 full_data[k] = np.append(full_data[k], stress_sat_data[k][indx])
             full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[16:31],'%Y%m%d_%H%M%S')]*sum(indx))
             f.close()
-#            
-    with open(sat + '_full_dataset.dk','wb') as f:
+    print('Finished: Building full dataset', flush=True)
+    
+    full_data_filename = working_dir + sat + '_full_dataset.dk'       
+    with open(full_data_filename,'wb') as f:
         pickle.dump(full_data, f)
+        print('Saved: Full dataset to: ' + full_data_filename, flush=True)
+
 #        
