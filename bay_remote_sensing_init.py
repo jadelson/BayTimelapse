@@ -14,11 +14,13 @@ if sat == 'l8':
     sat_test_key = 'RHOW_655'
     raw_sat_directory = base_dir + 'landsat_order/landsat8_convert/'
     wind_data_file = base_dir + 'weather_data/weather_data_2014-2017.dk'
+    sat_start_date = 2014
 if sat == 'l7':
     sat_keys = [ 'LAT', 'LON',  'RHOW_479', 'RHOW_561', 'RHOW_661', 'RHOW_835'] #Landsat 7
     sat_test_key = 'RHOW_661'
     raw_sat_directory = base_dir + 'landsat_order/landsat7_convert/'
     wind_data_file = base_dir + 'weather_data/weather_data_2000-2017.dk'
+    sat_start_date = 2000
 
 
 sat_tide_directory = base_dir + 'sat_and_rusty/'
