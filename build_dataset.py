@@ -16,16 +16,9 @@ import numpy as np
 import pickle
 from get_coord import get_coord
 from scipy.optimize import minimize
+from bay_remote_sensing_init import *
 
-# Set directory locations
-base_dir = '/Volumes/Stella/'
-sat_directory = base_dir + 'landsat_order/landsat8_convert/'
-sat_tide_directory = base_dir + 'sat_and_rusty/'
-wind_sat_tide_directory = base_dir + 'wind_sat_and_rusty/'
-stress_sat_directory = base_dir + 'stress_sat/'
-wind_data_file = base_dir + 'weather_data/weather_data_2014-2017.dk'
-fetch_file = 'cached_fetched.dk'
-
+#%%
 ## Here are some functions!
 
 # A function that writes a combined satellite and tidal dataset
@@ -38,7 +31,6 @@ def write_sat_data(satnc, tide_data, date):
     :param date: date of data
     """
     sat_data = {}
-    sat_keys = [ 'LAT', 'LON',  'RHOW_443', 'RHOW_483', 'RHOW_561', 'RHOW_655', 'RHOW_865'] #Landsat 8
     final_data = {}
     for k in sat_keys:
         final_data[k] = []
@@ -48,7 +40,7 @@ def write_sat_data(satnc, tide_data, date):
     for s in sat_keys:
         sat_data[s] = np.asarray(satnc[s][:,:])
 
-    if np.min(sat_data['RHOW_655']>= 9.96921e35):
+    if np.min(sat_data[sat_test_key]>= 9.96921e35):
         return None
     
     maxlat = np.max(sat_data['LAT'])
@@ -69,7 +61,7 @@ def write_sat_data(satnc, tide_data, date):
         x,y, A = get_coord(sat_data,lat[i],lon[i],n[0],n[1],A)
         if x >= n[0] or y >= n[1]:
             continue
-        if sat_data['RHOW_655'][x,y] >= 9.96921e35 or np.isnan(sat_data['RHOW_655'][x,y]):
+        if sat_data[sat_test_key][x,y] >= 9.96921e35 or np.isnan(sat_data[sat_test_key][x,y]):
             continue
         
         linedata = {k:sat_data[k][x,y] for k in sat_keys}
@@ -415,7 +407,7 @@ def stress_worker(filename, fetch_model):
 
 
 def sat_worker(filename):
-    model = nc.Dataset(sat_directory+filename)
+    model = nc.Dataset(raw_sat_directory+filename)
     sat_date = datetime.strptime(model.DATE + ' '+ model.TIME[0:8],'%Y%m%d %H %M %S')        
     tide_data = find_tide_data_by_time(sat_date, base_dir + 'raw_rusty_tides/')
     if not tide_data == None:
@@ -426,24 +418,29 @@ def sat_worker(filename):
     model.close()
     return(sat_date)
     
+
     
 if __name__ == "__main__":
-#    # Load tide model data (requires current velocities, water level, and depth)
-#    sat_inputs = [k for k in os.listdir(sat_directory) if k.endswith('.nc')]
+    # Load tide model data (requires current velocities, water level, and depth)
+    sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
+    jobs = []
+    for filename in sat_inputs:
+        p = multiprocessing.Process(target=sat_worker, args=(filename,))
+        jobs.append(p)
+        p.start()
 #    results = Parallel(n_jobs=3)(delayed(sat_worker)(filename) for filename in sat_inputs)
    
     # Load results from the wave model (requires wave height, wave direction, wave period)
-    fetch_file = 'savedfetchmodel.dk'
     if os.path.isfile(fetch_file):
-        with open('savedfetchmodel.dk','rb') as f:
+        with open(fetch_file,'rb') as f:
            fetch_model = pickle.load(f)
-#    else:
-#        fetch_model = FetchModel()
-#        if not os.path.isfile(wind_data_file): 
-#            wind_station_data = fetch_model.downloadwinds(2014,2017)
-#            fetch_model.savedata(wind_station_data,wind_data_file)
-#        else:
-#            wind_station_data = fetch_model.loadwindfromfile(wind_data_file)    
+    else:
+        fetch_model = FetchModel()
+        if not os.path.isfile(wind_data_file): 
+            wind_station_data = fetch_model.downloadwinds(2014,2017)
+            fetch_model.savedata(wind_station_data,wind_data_file)
+        else:
+            wind_station_data = fetch_model.loadwindfromfile(wind_data_file)    
 #    
     # we run the stress_worker fucntion for each satellite image we have 
     # downloaded that writes a full stress file dataset for each filename
@@ -466,6 +463,6 @@ if __name__ == "__main__":
             full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[16:31],'%Y%m%d_%H%M%S')]*sum(indx))
             f.close()
 #            
-    with open('/Users/jadelson/Dropbox/phdResearch/AllOptical/timelapse_work/full_dataset.dk','wb') as f:
+    with open(sat + '_full_dataset.dk','wb') as f:
         pickle.dump(full_data, f)
 #        

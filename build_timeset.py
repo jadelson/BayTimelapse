@@ -9,26 +9,13 @@ Created on Sun Jan 29 19:05:44 2017
 from datetime import datetime
 import netCDF4 as nc
 import os
-from joblib import Parallel, delayed
+#from joblib import Parallel, delayed
+import multiprocessing
 import numpy as np
 import pickle
 from get_coord import get_coord
 import build_dataset
-
-# Set directory locations
-base_dir = '/Volumes/Stella/'
-working_dir = './'
-raw_sat_directory = base_dir + 'landsat_order/landsat7_convert/'
-sat_filter_directory = base_dir + 'sat_on_mesh/'
-sat = 'l7'
-
-
-if sat == 'l8':
-    sat_keys = [ 'LAT', 'LON',  'RHOW_443', 'RHOW_483', 'RHOW_561', 'RHOW_655', 'RHOW_865'] #Landsat 8
-    sat_test_key = 'RHOW_655'
-if sat == 'l7':
-    sat_keys = [ 'LAT', 'LON',  'RHOW_479', 'RHOW_561', 'RHOW_661', 'RHOW_835'] #Landsat 7
-    sat_test_key = 'RHOW_661'
+from bay_remote_sensing_init import *
 
 
 # A function that writes a combined satellite and tidal dataset
@@ -97,6 +84,7 @@ def write_sat_data(satnc, tide_data, date):
 
 
 def sat_worker(filename, tide_data):
+    
     """
     Extract satelite data onto the tidal model grid
     
@@ -110,20 +98,28 @@ def sat_worker(filename, tide_data):
             print('Sat: ' + raw_sat_directory+filename)
             print(len(tide_data['lat']), len(combined_sat_data['lat']))
     model.close()
-    return combined_sat_data   
+    return
     
 
 
 if __name__ == "__main__":
+    print('Satellite data filteration running...')
     # Load tide model data (requires current velocities, water level, and depth)
     blank_date = datetime.strptime('20160301 18 30 00','%Y%m%d %H %M %S')        
     tide_data = build_dataset.find_tide_data_by_time(blank_date, base_dir + 'raw_rusty_tides/')
     sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
-    blah = sat_worker(sat_inputs[3], tide_data)
+#    blah = sat_worker(sat_inputs[3], tide_data)
+
+    jobs = []
+    for filename in sat_inputs:
+        p = multiprocessing.Process(target=sat_worker, args=(filename, tide_data,))
+        jobs.append(p)
+        p.start()
 #    results = Parallel(n_jobs=4)(delayed(sat_worker)(filename, tide_data) for filename in sat_inputs)
+    print('Satellite Data filteration Complete.')
 
-
-##                     
+##  
+    print('Satellite data combination running...')             
     full_data = {}
     full_data['date'] = np.array([])              
     for filename in os.listdir(sat_filter_directory):
@@ -139,7 +135,9 @@ if __name__ == "__main__":
                 full_data[k] = np.append(full_data[k], combined_sat_data[k])
             full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[29:44],'%Y%m%d_%H%M%S')]*len(combined_sat_data[k]))
             f.close()
-##            
-    with open(working_dir+sat+'_full_dataset.dk','wb') as f:
+##  
+    print('Satellite data combination complete.')             
+    with open(working_dir+sat+'_no_stress_dataset.dk','wb') as f:
         pickle.dump(full_data, f)
+    print('Data dump complete.')
 ##        

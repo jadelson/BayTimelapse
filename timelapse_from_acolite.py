@@ -14,17 +14,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import imageio
+from bay_remote_sensing_init import *
 
 #%%
-#with open('/Users/jadelson/Dropbox/phdResearch/AllOptical/timelapse_work/full_dataset.dk','rb') as f:
-#    full_data = pickle.load(f)
-data_length = len(full_data['tau'])   
+
+    
+    
+#%%
+with open(working_dir + sat + '_nostress_dataset.dk','rb') as f:
+    full_data = pickle.load(f)
+
+#%%
+data_length = len(full_data['lat'])   
 date_list = []
 
-rho = np.asarray(full_data['RHOW_865'])
+
+rho = np.asarray(full_data['RHOW_835'])
 A = 3031.75 
 B = 0
 C = 0.2114
+A = 2379.77
+B = 1.8
+C = 0.2103
 full_data['ssc'] = A*rho/(1 - rho/C) + B
     
 for v in full_data['date']:
@@ -102,13 +113,15 @@ for i in range(0,data_length):
     for k in full_data.keys():
         data_by_phase[phases[date]][k].append(full_data[k][i])
 
-with open('data_by_phase.dk','wb') as f:
-    pickle.dump(data_by_phase, f)
-    
+#full_data = None
+#
+#with open('l7_data_by_phase.dk','wb') as f:
+#    pickle.dump(data_by_phase, f)
+#    
 #%%
-
-with open('data_by_phase.dk','rb') as f:
-    data_by_phase = pickle.load(f)
+#
+#with open('data_by_phase.dk','rb') as f:
+#    data_by_phase = pickle.load(f)
     
 phase_list = np.asarray(list(data_by_phase.keys()))
 phase_list = np.sort(phase_list)
@@ -125,7 +138,7 @@ phase_list = np.sort(phase_list)
 #    ax.set_autoscaley_on(False)
 #    plt.scatter(x,y,c=ssc,s=.1, vmin=0, vmax=150)
 #    plt.colorbar()
-#    plt.savefig('figures/ssc_'+str(phase)+'.png', bbox_inches='tight')
+#    plt.savefig('figures/l7_ssc_'+str(phase)+'.png', bbox_inches='tight')
     
    
 #%%
@@ -145,7 +158,7 @@ for i in range(0,nbuckets):
         continue
     data = {}
     phase = str(np.round((bins[i] - dt)/3600, 1))
-    name = 'figures/median_ssc_'+phase+'.png'
+    name = working_dir + 'figures/median_ssc_'+phase+'.png'
     for p in phase_list[digitized == i]:
         v = data_by_phase[p]
         for j in range(0,len(v['lat'])):
@@ -164,7 +177,7 @@ for i in range(0,nbuckets):
         ssc.append(np.median(data[la,lo]))
     plt.clf()
     plt.title(phase)
-    plt.scatter(lon,lat,c=ssc,s=.1, vmin=0, vmax=150)
+    plt.scatter(lon,lat,c=ssc,s=.1, vmin=0, vmax=80)
     plt.colorbar()
     plt.xlim([-122.55, -121.75])
     plt.ylim([37.4, 38.3])
@@ -179,9 +192,9 @@ for i in range(0,nbuckets):
     filenames.append(name)
 
 #%%
-with imageio.get_writer('figures/tide.gif', mode='I') as writer:
+with imageio.get_writer(working_dir + 'figures' + sat + '_tide.gif', mode='I') as writer:
     for filename in filenames:
-        for k in range(0,5):
+        for k in range(0,2):
             image = imageio.imread(filename)
             writer.append_data(image)
     
