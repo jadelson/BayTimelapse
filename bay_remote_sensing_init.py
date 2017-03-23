@@ -5,8 +5,8 @@ Created on Thu Mar 23 13:09:05 2017
 
 @author: jadelson
 """
-sat = 'l8'
-base_dir = '/Volumes/Stella/'
+sat = 'l7'
+base_dir = '/scratch/jadelson/'
 working_dir = './'
 
 if sat == 'l8':
