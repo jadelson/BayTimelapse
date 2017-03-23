@@ -16,7 +16,7 @@ import pickle
 from get_coord import get_coord
 import build_dataset
 from bay_remote_sensing_init import *
-
+import itertools
 
 # A function that writes a combined satellite and tidal dataset
 def write_sat_data(satnc, tide_data, date):
@@ -91,6 +91,8 @@ def sat_worker(filename, tide_data):
     :param filename: name of the Acolite corrected netcdf satellite file
     :param tide_data: dict of tidal data at each point in domain
     """
+    print('processing ' + filename + ' on CPU: ', str(multiprocessing.current_process()))
+    
     model = nc.Dataset(raw_sat_directory+filename)
     if not tide_data == None:
         combined_sat_data = write_sat_data(model, tide_data, model.DATE+'_'+model.HOUR+model.MINUTE+model.SECOND[0:2])
@@ -99,7 +101,7 @@ def sat_worker(filename, tide_data):
             print(len(tide_data['lat']), len(combined_sat_data['lat']))
     model.close()
     return
-    
+ 
 
 
 if __name__ == "__main__":
@@ -111,11 +113,11 @@ if __name__ == "__main__":
 #    blah = sat_worker(sat_inputs[3], tide_data)
 
     jobs = []
-    for filename in sat_inputs:
-        p = multiprocessing.Process(target=sat_worker, args=(filename, tide_data,))
-        jobs.append(p)
-        p.start()
-#    results = Parallel(n_jobs=4)(delayed(sat_worker)(filename, tide_data) for filename in sat_inputs)
+    with multiprocessing.Pool() as p:
+        p.starmap(sat_worker, zip(sat_inputs, itertools.repeat(tide_data)))
+        p.close()
+        p.join()
+
     print('Satellite Data filteration Complete.')
 
 ##  
