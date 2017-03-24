@@ -17,7 +17,7 @@ import pickle
 from get_coord import get_coord
 from scipy.optimize import minimize
 import itertools
-from bay_remote_sensing_init import *
+from init_builder import *
 
 #%%
 ## Here are some functions!
@@ -322,12 +322,13 @@ def stress_worker(filename, fetch_model):
         print('FAIL ' + filename, flush=True)
         return
     print('Stress processing ' + filename + ' on CPU: ', str(multiprocessing.current_process()), flush=True)
-å    # Extract date
-    date_string = filename[19:27]
+    # Extract date
+    date_string = filename[16:24]
+    print(filename, date_string)
     file_date = datetime.strptime(date_string,'%Y%m%d')
-    satf = [s for s in os.listdir(sat_directory) if file_date.strftime('%Y%j') in s]
+    satf = [s for s in os.listdir(raw_sat_directory) if file_date.strftime('%Y%j') in s]
     satf = satf[0]
-    model = nc.Dataset(sat_directory+satf)
+    model = nc.Dataset(raw_sat_directory+satf)
     sat_datetime = datetime.strptime(date_string + ' ' + model.TIME[0:8],'%Y%m%d %H %M %S')
     save_date = sat_datetime.strftime('%Y%m%d_%H%M%S')
     epoch = datetime.utcfromtimestamp(0)
@@ -416,7 +417,7 @@ def sat_worker(filename):
     if not tide_data == None:
         sat_tide_data = write_sat_data(model, tide_data, model.DATE+model.HOUR+model.MINUTE+model.SECOND[0:2])
         if not sat_tide_data == None:
-            print('Wrote sat: ' + sat_directory+filename)
+            print('Wrote sat: ' + sat_tide_directory+filename)
     model.close()
     return(sat_date)
     
@@ -427,11 +428,11 @@ if __name__ == "__main__":
     print('Begin building a full stress dataset for sat = '+sat, flush=True)
     print('Starting: Merge satellite and tide data', flush=True)
     sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
-    with multiprocessing.Pool() as p:
-        p.map(sat_worker, sat_inputs)
-        p.close()
-        p.join()
-    print('Finished: Merge satellite and tide data', flush=True)
+#    with multiprocessing.Pool() as p:
+#        p.map(sat_worker, sat_inputs)
+#        p.close()
+#        p.join()
+#    print('Finished: Merge satellite and tide data', flush=True)
 
    
     # Load results from the wave model (requires wave height, wave direction, wave period)
@@ -442,10 +443,12 @@ if __name__ == "__main__":
     else:
         fetch_model = FetchModel()
         if not os.path.isfile(wind_data_file): 
-            wind_station_data = fetch_model.downloadwinds(sat_start_date,2018)
+            wind_station_data = fetch_model.downloadwinds(sat_start_date,2017)
             fetch_model.savedata(wind_station_data,wind_data_file)
         else:
-            wind_station_data = fetch_model.loadwindfromfile(wind_data_file)   
+            wind_station_data = fetch_model.loadwindfromfile(wind_data_file)
+        with open(fetch_file,'wb') as f:
+            pickle.dump(fetch_model, f)   
     print('Finished: Retreiving fetch model', flush=True) 
     
     # we run the stress_worker fucntion for each satellite image we have 
@@ -475,7 +478,7 @@ if __name__ == "__main__":
                 if not k in full_data.keys():
                     full_data[k] = np.array([])
                 full_data[k] = np.append(full_data[k], stress_sat_data[k][indx])
-            full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[16:31],'%Y%m%d_%H%M%S')]*sum(indx))
+            full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[19:34],'%Y%m%d_%H%M%S')]*sum(indx))
             f.close()
     print('Finished: Building full dataset', flush=True)
     

@@ -15,7 +15,7 @@ import numpy as np
 import pickle
 from get_coord import get_coord
 import build_dataset
-from bay_remote_sensing_init import *
+from init_builder import *
 import itertools
 
 # A function that writes a combined satellite and tidal dataset
@@ -91,8 +91,7 @@ def sat_worker(filename, tide_data):
     :param filename: name of the Acolite corrected netcdf satellite file
     :param tide_data: dict of tidal data at each point in domain
     """
-    print('processing ' + filename + ' on CPU: ', str(multiprocessing.current_process()))
-    
+    print('processing ' + filename + ' on CPU: ' + str(multiprocessing.current_process()), flush=True)
     model = nc.Dataset(raw_sat_directory+filename)
     if not tide_data == None:
         combined_sat_data = write_sat_data(model, tide_data, model.DATE+'_'+model.HOUR+model.MINUTE+model.SECOND[0:2])

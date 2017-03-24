@@ -2,7 +2,7 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline, interp1d, interp2d
 import soda.dataio.datadownload.getNOAAWeatherStation as noaa
 import utm
-from bay_remote_sensing_init import *
+from init_builder import *
 import pickle
 import os
 genericbathy  = working_dir + '/msl1k.asc'
