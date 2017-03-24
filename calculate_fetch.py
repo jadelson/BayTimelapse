@@ -2,11 +2,10 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline, interp1d, interp2d
 import soda.dataio.datadownload.getNOAAWeatherStation as noaa
 import utm
-
+from bay_remote_sensing_init import *
 import pickle
 import os
-cwd = os.path.dirname(os.path.realpath(__file__))
-genericbathy  = cwd + '/msl1k.asc'
+genericbathy  = working_dir + '/msl1k.asc'
 g = 9.81  # gravity constant
 max_fetch_distance = 60000  # maximum fetch distance
 
@@ -161,9 +160,9 @@ class FetchModel:
 
         latlon = (llcorner[1], urcorner[1], llcorner[0], urcorner[0])
 
-        localdir = '/Users/jadelson/Desktop/baydelta_desktop/Nathan Stuff/winds'
-        ncfile = '/Users/jadelson/Desktop/baydelta_desktop/Nathan Stuff/winds/NCDCNWS_AirObs_2016.nc'
-        shpfile = '/Users/jadelson/Desktop/baydelta_desktop/Nathan Stuff/winds/NCDCNWS_AirObs_2016.shp'
+        localdir = base_dir + 'weather_data/winds'
+        ncfile = base_dir + 'weather_data/winds/NCDCNWS_AirObs_'+str(timeend) + '.nc'
+        shpfile = base_dir + 'weather_data/winds/NCDCNWS_AirObs_'+str(timeend) + '.shp'
         data = noaa.noaaish2nc(latlon, [timestart, timeend], localdir, ncfile, shpfile)
 
         self.data = self._convertwinddata(data)
@@ -344,7 +343,7 @@ if __name__ == "__main__":
 #    model.savedata(data, '/Users/jadelson/Dropbox/phdResearch/AllOptical/sfbayrsproper/fetch_data.dk')
     # model.savedata(data, '/Users/jadelson/Desktop/data2.pk') #save data to file for saving time later
     fetch_model = FetchModel()
-    wind_data_file = '/Volumes/Stella/weather_data/weather_data_2014-2017.dk'
+    wind_data_file = base_dir + 'weather_data/weather_data_2014-2017.dk'
 
     if not os.path.isfile(wind_data_file): 
         wind_station_data = fetch_model.downloadwinds(2014,2017)
