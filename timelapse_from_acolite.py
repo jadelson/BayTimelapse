@@ -15,27 +15,28 @@ import matplotlib.pyplot as plt
 import pickle
 import imageio
 from bay_remote_sensing_init import *
-
+#import bay_remote_sensing_init as bs
 #%%
 
     
     
 #%%
-with open(working_dir + sat + '_nostress_dataset.dk','rb') as f:
+with open(working_dir + sat + '_full_dataset.dk','rb') as f:
     full_data = pickle.load(f)
+    
+with open(working_dir + 'tide_phase_lookup.dk','rb') as f:
+    phase = pickle.load(f)
 
 #%%
 data_length = len(full_data['lat'])   
 date_list = []
 
 
-rho = np.asarray(full_data['RHOW_835'])
-A = 3031.75 
+rho = np.asarray(full_data[sat_test_key])
+A = 400 
 B = 0
-C = 0.2114
-A = 2379.77
-B = 1.8
-C = 0.2103
+C = 0.170991
+
 full_data['ssc'] = A*rho/(1 - rho/C) + B
     
 for v in full_data['date']:
@@ -166,7 +167,9 @@ for i in range(0,nbuckets):
             lo = np.round(v['lon'][j],4)
             if not (la,lo) in data.keys():
                 data[(la,lo)] = []
-            data[(la,lo)].append(v['ssc'][j])
+#            data[(la,lo)].append(v['ssc'][j])
+            data[(la,lo)].append(v['eta'][j]+v['depth'][j])
+
     lat = []
     lon = []
     ssc = []
@@ -177,7 +180,7 @@ for i in range(0,nbuckets):
         ssc.append(np.median(data[la,lo]))
     plt.clf()
     plt.title(phase)
-    plt.scatter(lon,lat,c=ssc,s=.1, vmin=0, vmax=80)
+    plt.scatter(lon,lat,c=ssc,s=.1, vmin=0, vmax=40)
     plt.colorbar()
     plt.xlim([-122.55, -121.75])
     plt.ylim([37.4, 38.3])

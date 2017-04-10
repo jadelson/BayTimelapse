@@ -5,10 +5,11 @@ Created on Thu Mar 23 13:09:05 2017
 
 @author: jadelson
 """
-sat = 'l8'
+
+sat = 'l7'
 base_dir = '/Volumes/Stella/'
 working_dir = './'
-
+print('Initialization sat: ' + sat)
 if sat == 'l8':
     sat_keys = [ 'LAT', 'LON',  'RHOW_443', 'RHOW_483', 'RHOW_561', 'RHOW_655', 'RHOW_865'] #Landsat 8
     sat_test_key = 'RHOW_655'
