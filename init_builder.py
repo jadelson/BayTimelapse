@@ -5,7 +5,7 @@ Created on Thu Mar 23 13:09:05 2017
 
 @author: jadelson
 """
-sat = 'l8'
+sat = 'l7'
 base_dir = '/scratch/jadelson/'
 working_dir = './'
 

@@ -428,11 +428,11 @@ if __name__ == "__main__":
     print('Begin building a full stress dataset for sat = '+sat, flush=True)
     print('Starting: Merge satellite and tide data', flush=True)
     sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
-#    with multiprocessing.Pool() as p:
-#        p.map(sat_worker, sat_inputs)
-#        p.close()
-#        p.join()
-#    print('Finished: Merge satellite and tide data', flush=True)
+    with multiprocessing.Pool() as p:
+        p.map(sat_worker, sat_inputs)
+        p.close()
+        p.join()
+    print('Finished: Merge satellite and tide data', flush=True)
 
    
     # Load results from the wave model (requires wave height, wave direction, wave period)
