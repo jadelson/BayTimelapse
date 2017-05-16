@@ -63,12 +63,13 @@ class FetchModel:
 
         :param x0: Easting of target point
         :param y0: Northing of target point
-        :param angle: Wind angle
+        :param angle: Wind angle (angle that the wind is coming from)
         :return: fetch (distance in meters)
         """
-        N = 1200
-        xnew = x0 + np.cos(angle) * np.linspace(0, max_fetch_distance, N)
-        ynew = y0 - np.sin(angle) * np.linspace(0, max_fetch_distance, N)
+        N = 5000
+        r = np.linspace(0, max_fetch_distance, N)
+        xnew = x0 + np.cos(angle) * r
+        ynew = y0 + np.sin(angle) * r
 #        print(xnew,ynew)
 #        print(self.f(xnew, ynew)[0,:])
 #        h = self.f(xnew, ynew)[0,:]
@@ -79,8 +80,9 @@ class FetchModel:
 #        
         for i in range(0,N):
             hq = self.f(xnew[i], ynew[i])[0][0]
+#            print(hq)
             if hq <= 0:
-                return np.sqrt(np.power(xnew[i] - x0, 2.0) + np.power(ynew[i] - y0, 2.0))
+                return r[i]
         return max_fetch_distance
 
     @staticmethod
@@ -108,7 +110,7 @@ class FetchModel:
         Call function for the model that provides the wave period and height at a specified location
         :param x0: Easting of target point
         :param y0: Northing of target point
-        :param angle: Wind angle
+        :param angle: Wind angle (angle that the wind is coming from aka direction upwind)
         :param u10: 10 m wind speed
         :param fetch: fetch of target location
         :return: T, Hs (wave period, wave height)
@@ -118,7 +120,7 @@ class FetchModel:
 
         h0 = self.f(x0, y0)[0,:]
         T, Hs = self._waveheight(u10, h0, fetch)
-        return T, Hs
+        return T, Hs, fetch
 
     @staticmethod
     def _convertwinddata(data):
@@ -279,12 +281,12 @@ class FetchModel:
         :param time: time of interest
         :return: T, Hs (Period and wave height)
         """
-        angle, U = self.windinterp(x0, y0, time)
+        angle, U, u, v = self.windinterp(x0, y0, time)
         #print(angle, U)
         angle = angle[0]-np.pi
         U = U[0]
         T, Hs = self.getwaveheight(x0, y0, angle, U)
-        return T, Hs, U, angle
+        return T, Hs, U, angle, u, v
 
     @staticmethod
     def savedata(data, filename):
