@@ -18,6 +18,7 @@ from get_coord import get_coord
 from scipy.optimize import minimize
 import itertools
 from init_builder import *
+import crspy.crspy as cr
 
 #%%
 ## Here are some functions!
@@ -225,28 +226,24 @@ def calculate_stress(data):
     rho = 1023
     nu = 10**-6
     z0 = 10**-4
+    kb = z0*30
     g = 9.81
      
     m = data['a0'].shape  
     data['H'] = np.empty(m)
     data['k'] = np.empty(m)
-    data['A'] = np.empty(m)
     data['k_x'] = np.empty(m)
     data['k_y'] = np.empty(m)
-    data['fw'] = np.empty(m)
+    data['fwc'] = np.empty(m)
     data['omega'] = np.empty(m)
-    data['Rew'] = np.empty(m)
-    data['Cd'] = np.empty(m)
-    data['tau_m_x'] = np.empty(m)
-    data['tau_w_x'] = np.empty(m)
-    data['tau_m_y'] = np.empty(m)
-    data['tau_w_y'] = np.empty(m)
-    data['tau_x'] = np.empty(m)
-    data['tau_y'] = np.empty(m)
-    data['tau_w'] = np.empty(m)
-    data['tau_m'] = np.empty(m)
-
-    data['tau'] = np.empty(m)
+    data['ustar_c'] = np.empty(m)
+    data['ustar_cw'] = np.empty(m)
+    data['ustar_w'] = np.empty(m)
+    data['delta_wc'] = np.empty(m)
+    data['z0a'] = np.empty(m)
+    data['tau_b'] = np.empty(m)
+    data['phi_c'] = np.empty(m)
+    data['tau_b'] = np.empty(m)
     
     data['omega'] = 2*np.pi/data['T']
 
@@ -256,62 +253,57 @@ def calculate_stress(data):
     v_vel_1 = np.array(data['v'])
 
     for i in range(0,m[0]):
-
         
+        #tide properties
         H = depth[i] + surface[i]
-        Cd = kappa**2*(np.log(H/z0) + z0/H - 1)**-2
         u = u_vel_1[i]
         v = v_vel_1[i]
-        mag_u = np.sqrt(u**2 + v**2)
-        tau_m_x = rho*Cd*mag_u*u
-        tau_m_y = rho*Cd*mag_u*v
-            
+        u_mag = np.sqrt(np.square(u) + np.square(v))
+        ustrc_est = u_mag*.41/(H*(np.log(H/z0)- 1))
+        
+        zr = H/2
+        u_mag_zr = ustrc_est/.41*np.log(zr/z0)
+        
+        #wave properties
+        angle_waves = data['theta'][i]  
         omega = data['omega'][i]
-        
         a0 = data['a0'][i]
-        angle = data['theta'][i]   
         
-
+        #Angle between tides and waves
+        phi_c = angle_waves - np.arctan2(v,u)
+#        if (phi_c < 0) phi_c += 2 * M_PI;
+        
+        #Calculate dispersion relation
         def dispersion_relation(k):
             return np.abs(omega**2 - g*k*np.tanh(k*H))
-        k = minimize(dispersion_relation,omega/(np.sqrt(g*H)),
-                options={'disp': False})
-        mag_k = np.abs(k.x)
         
-        kx = mag_k*np.cos(angle)
-        ky = -mag_k*np.sin(angle)
+        if omega*np.sqrt(H/g) < 0.05:
+            k = omega/np.sqrt(g*H)
+            ub = omega*a0/(k*H)
+        elif omega*omega/g*H > 50:
+            k = omega*omega/g
+            ub = 0
+        else:
+            kall = minimize(dispersion_relation,omega/(np.sqrt(g*H)),
+                            options={'disp': False})
+            k = np.abs(kall.x[0])
+            ub = omega*a0/np.sinh(k*H)
+
     
-        A = a0/(np.sinh(mag_k*H))
-        
-        Rew = A**2*omega/nu +np.finfo(float).eps
-        fw = 2*Rew**(-0.5)
-        mag_tau_w = 0.5*rho*fw*(A*omega)**2
-        tau_w_x = mag_tau_w*kx/mag_k
-        tau_w_y = mag_tau_w*ky/mag_k
-    
-        tau_x = tau_w_x + tau_m_x
-        tau_y = tau_w_y + tau_m_y
-        tau = np.sqrt(tau_x**2 + tau_y**2)    
- 
-        
+        ustrc, ustrr, ustrwm, dwc, fwc, zoa = cr.m94( ub, omega, u_mag_zr, zr, phi_c, kb)
+
         data['H'][i] = H
-        data['k'][i] = mag_k
-        data['k_x'][i] = kx
-        data['k_y'][i] = ky
-        data['A'][i] = A
-        data['fw'][i] = fw      
-        data['Rew'][i] = Rew
-        data['Cd'][i] = Cd 
-        data['tau_m_x'][i] = tau_m_x
-        data['tau_w_x'][i] = tau_w_x
-        data['tau_m_y'][i] = tau_m_y
-        data['tau_w_y'][i] = tau_w_y
-        data['tau_w'][i] = mag_tau_w
-        data['tau_m'][i] = np.sqrt(tau_m_x*tau_m_x + tau_m_y*tau_m_y)
-        data['tau_x'][i] = tau_x
-        data['tau_y'][i] = tau_y
-        data['tau'][i] = tau
-    
+        data['k'][i] = k
+        data['k_x'][i] = k*np.cos(angle_waves)
+        data['k_y'][i] = k*np.sin(angle_waves)
+        data['fwc'][i] = fwc      
+        data['ustar_c'][i] = ustrc
+        data['ustar_cw'][i] = ustrr
+        data['ustar_w'][i] = ustrwm
+        data['delta_wc'][i] = dwc
+        data['z0a'][i] = zoa
+        data['tau_b'][i] = ustrr*ustrr/rho
+        data['phi_c'][i] = phi_c
     return data
 
 
@@ -328,12 +320,12 @@ def stress_worker(filename, fetch_model):
     file_date = datetime.strptime(date_string,'%Y%m%d')
     satf = [s for s in os.listdir(raw_sat_directory) if file_date.strftime('%Y%j') in s]
     satf = satf[0]
-    model = nc.Dataset(raw_sat_directory+satf)
+    model = nc.Dataset(raw_sat_directory + satf)
     sat_datetime = datetime.strptime(date_string + ' ' + model.TIME[0:8],'%Y%m%d %H %M %S')
     save_date = sat_datetime.strftime('%Y%m%d_%H%M%S')
     epoch = datetime.utcfromtimestamp(0)
     time = (sat_datetime - epoch).total_seconds()/60
-    with open(sat_tide_directory+filename, 'rb') as f:
+    with open(sat_tide_directory + filename, 'rb') as f:
         sat_tide_data = pickle.load(f)
 
     x2 = np.zeros(sat_tide_data['lat'].shape)
@@ -373,23 +365,25 @@ def stress_worker(filename, fetch_model):
     
     for k in wind_sat_tide_data.keys():
         wind_sat_tide_data[k] = wind_sat_tide_data[k][indx]
-    theta = np.arctan2(u_wind[indx], v_wind[indx]) - np.pi
+    theta = np.arctan2(v_wind[indx], u_wind[indx])
                       
     u10_0 = umag_wind[indx]
     x_0 = x2[indx]
     y_0 = y2[indx]
     T = np.zeros(x_0.shape)
     Hs = np.zeros(x_0.shape)
+    fetch = np.zeros(x_0.shape)
     for i in range(len(x_0)):
-        Ttemp, Hstemp = fetch_model.getwaveheight(np.array(x_0[i]), np.array(y_0[i]), np.array(theta[i]), np.array(u10_0[i]))
+        Ttemp, Hstemp, feti = fetch_model.getwaveheight(np.array(x_0[i]), np.array(y_0[i]), np.array(theta[i]) + np.pi, np.array(u10_0[i]))
         T[i] = Ttemp[0]
         Hs[i] = Hstemp[0]
+        fetch[i] = feti
     wind_sat_tide_data['theta'] = theta
     wind_sat_tide_data['easting'] = x_0
     wind_sat_tide_data['northin'] = y_0
     wind_sat_tide_data['T'] = T
     wind_sat_tide_data['a0'] = Hs
-    
+    wind_sat_tide_data['fetch'] = fetch
     
     indx2 = ~ np.isnan(Hs)
     
@@ -403,7 +397,7 @@ def stress_worker(filename, fetch_model):
 #        
     # Calculate the sat-stress database from tide and wave data then save
     stress_sat_data = calculate_stress(wind_sat_tide_data)
-    with open(stress_sat_directory+sat+'_stress_sat_data_'+save_date+'.dk','wb') as g:
+    with open(stress_sat_directory + sat +'_stress_sat_data_'+save_date+'.dk','wb') as g:
         pickle.dump(stress_sat_data,g)     
 
     return filename      
@@ -424,6 +418,7 @@ def sat_worker(filename):
 
     
 if __name__ == "__main__":
+<<<<<<< HEAD
     # Load tide model data (requires current velocities, water level, and depth)
     print('Begin building a full stress dataset for sat = '+sat, flush=True)
     print('Starting: Merge satellite and tide data', flush=True)
@@ -433,6 +428,17 @@ if __name__ == "__main__":
         p.close()
         p.join()
     print('Finished: Merge satellite and tide data', flush=True)
+=======
+#    # Load tide model data (requires current velocities, water level, and depth)
+#    print('Begin building a full stress dataset for sat = '+ sat, flush=True)
+#    print('Starting: Merge satellite and tide data', flush=True)
+#    sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
+#    with multiprocessing.Pool() as p:
+#        p.map(sat_worker, sat_inputs)
+#        p.close()
+#        p.join()
+#    print('Finished: Merge satellite and tide data', flush=True)
+>>>>>>> 60961a2ba4fe3200e6d34475ae8781ff959ab58d
 
    
     # Load results from the wave model (requires wave height, wave direction, wave period)
@@ -473,13 +479,14 @@ if __name__ == "__main__":
         print('grabbing: ' + stress_sat_directory+filename)
         with open(stress_sat_directory+filename,'rb') as f:
             stress_sat_data = pickle.load(f)
-            indx = ~ (np.isnan(stress_sat_data['tau']) | np.isinf(stress_sat_data['tau']))
+            indx = ~ (np.isnan(stress_sat_data['tau_b']) | np.isinf(stress_sat_data['tau_b']))
             for k in stress_sat_data.keys():
                 if not k in full_data.keys():
                     full_data[k] = np.array([])
                 full_data[k] = np.append(full_data[k], stress_sat_data[k][indx])
             full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[19:34],'%Y%m%d_%H%M%S')]*sum(indx))
             f.close()
+        break
     print('Finished: Building full dataset', flush=True)
     
     full_data_filename = working_dir + sat + '_full_dataset.dk'       

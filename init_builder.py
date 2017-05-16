@@ -5,7 +5,7 @@ Created on Thu Mar 23 13:09:05 2017
 
 @author: jadelson
 """
-sat = 'l7'
+sat = 'l8'
 base_dir = '/scratch/jadelson/'
 working_dir = './'
 print('Initialization sat: ' + sat)
