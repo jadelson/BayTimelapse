@@ -415,70 +415,74 @@ def sat_worker(filename):
     model.close()
     return(sat_date)
     
-
     
 if __name__ == "__main__":
-    print('Begin building a full stress dataset for sat = '+sat, flush=True)
-    print('Starting: Merge satellite and tide data', flush=True)
-    sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
-    with multiprocessing.Pool() as p:
-        p.map(sat_worker, sat_inputs)
-        p.close()
-        p.join()
-    print('Finished: Merge satellite and tide data', flush=True)
+    do_sat_merge = True
+    do_stress_work = True
+    do_build_fulldata = True
+    
+    if(do_sat_merge):
+        print('Begin building a full stress dataset for sat = '+sat, flush=True)
+        print('Starting: Merge satellite and tide data', flush=True)
+        sat_inputs = [k for k in os.listdir(raw_sat_directory) if k.endswith('.nc')]
+        with multiprocessing.Pool() as p:
+            p.map(sat_worker, sat_inputs)
+            p.close()
+            p.join()
+        print('Finished: Merge satellite and tide data', flush=True)
 
-   
-    # Load results from the wave model (requires wave height, wave direction, wave period)
-    print('Starting: Retreiving fetch model', flush=True)
-    if os.path.isfile(fetch_file):
-        with open(fetch_file,'rb') as f:
-           fetch_model = pickle.load(f)
-    else:
-        fetch_model = FetchModel()
-        if not os.path.isfile(wind_data_file): 
-            wind_station_data = fetch_model.downloadwinds(sat_start_date,2017)
-            fetch_model.savedata(wind_station_data,wind_data_file)
+    if do_stress_work:
+        # Load results from the wave model (requires wave height, wave direction, wave period)
+        print('Starting: Retreiving fetch model', flush=True)
+        if os.path.isfile(fetch_file):
+            with open(fetch_file,'rb') as f:
+               fetch_model = pickle.load(f)
         else:
-            wind_station_data = fetch_model.loadwindfromfile(wind_data_file)
-        with open(fetch_file,'wb') as f:
-            pickle.dump(fetch_model, f)   
-    print('Finished: Retreiving fetch model', flush=True) 
-    
-    # we run the stress_worker fucntion for each satellite image we have 
-    # downloaded that writes a full stress file dataset for each filename
-    print('Starting: Compiling satellite and stress data', flush=True)
-    stress_inputs = [k for k in os.listdir(sat_tide_directory) if k[0:2] == sat]
-    with multiprocessing.Pool() as p:
-        p.starmap(stress_worker, zip(stress_inputs, itertools.repeat(fetch_model)))
-        p.close()
-        p.join()
-    print('Finished: Compiling satellite and stress data', flush=True)
+            fetch_model = FetchModel()
+            if not os.path.isfile(wind_data_file): 
+                wind_station_data = fetch_model.downloadwinds(sat_start_date,2017)
+                fetch_model.savedata(wind_station_data,wind_data_file)
+            else:
+                wind_station_data = fetch_model.loadwindfromfile(wind_data_file)
+            with open(fetch_file,'wb') as f:
+                pickle.dump(fetch_model, f)   
+        print('Finished: Retreiving fetch model', flush=True) 
+        
+        # we run the stress_worker fucntion for each satellite image we have 
+        # downloaded that writes a full stress file dataset for each filename
+        print('Starting: Compiling satellite and stress data', flush=True)
+        stress_inputs = [k for k in os.listdir(sat_tide_directory) if k[0:2] == sat]
+        with multiprocessing.Pool() as p:
+            p.starmap(stress_worker, zip(stress_inputs, itertools.repeat(fetch_model)))
+            p.close()
+            p.join()
+        print('Finished: Compiling satellite and stress data', flush=True)
 
-#
-    print('Starting: Building full dataset', flush=True)
-                     
-    full_data = {}
-    full_data['date'] = np.array([])              
-    for filename in os.listdir(stress_sat_directory):
-        if not filename[0:2] == sat:
-            continue
-        stress_sat_data = {}
-        print('grabbing: ' + stress_sat_directory+filename)
-        with open(stress_sat_directory+filename,'rb') as f:
-            stress_sat_data = pickle.load(f)
-            indx = ~ (np.isnan(stress_sat_data['tau_b']) | np.isinf(stress_sat_data['tau_b']))
-            for k in stress_sat_data.keys():
-                if not k in full_data.keys():
-                    full_data[k] = np.array([])
-                full_data[k] = np.append(full_data[k], stress_sat_data[k][indx])
-            full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[19:34],'%Y%m%d_%H%M%S')]*sum(indx))
-            f.close()
-        break
-    print('Finished: Building full dataset', flush=True)
-    
-    full_data_filename = working_dir + sat + '_full_dataset.dk'       
-    with open(full_data_filename,'wb') as f:
-        pickle.dump(full_data, f)
-        print('Saved: Full dataset to: ' + full_data_filename, flush=True)
+    if do_build_fulldata:
+        print('Starting: Building full dataset', flush=True)
+                         
+        full_data = {}
+        full_data['date'] = np.array([])              
+        for filename in os.listdir(stress_sat_directory):
+            if not filename[0:2] == sat:
+                continue
+            stress_sat_data = {}
+            print('grabbing: ' + stress_sat_directory+filename)
+            with open(stress_sat_directory+filename,'rb') as f:
+                stress_sat_data = pickle.load(f)
+                indx = ~ (np.isnan(stress_sat_data['tau_b']) | np.isinf(stress_sat_data['tau_b']))
+                for k in stress_sat_data.keys():
+                    if not k in full_data.keys():
+                        full_data[k] = np.array([])
+                    full_data[k] = np.append(full_data[k], stress_sat_data[k][indx])
+                full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[19:34],'%Y%m%d_%H%M%S')]*sum(indx))
+                f.close()
+            break
+        print('Finished: Building full dataset', flush=True)
+        
+        full_data_filename = working_dir + sat + '_full_dataset.dk'       
+        with open(full_data_filename,'wb') as f:
+            pickle.dump(full_data, f)
+            print('Saved: Full dataset to: ' + full_data_filename, flush=True)
 
 #        
