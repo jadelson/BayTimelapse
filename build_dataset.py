@@ -244,7 +244,11 @@ def calculate_stress(data):
     data['tau_b'] = np.empty(m)
     data['phi_c'] = np.empty(m)
     data['tau_b'] = np.empty(m)
-    
+    data['ub'] = np.empty(m)
+    data['u_mag_zr'] = np.empty(m)
+    data['zr'] = np.empty(m)
+    data['kb'] = np.empty(m)
+             
     data['omega'] = 2*np.pi/data['T']
 
     depth = np.array(data['depth'])
@@ -291,7 +295,11 @@ def calculate_stress(data):
 
     
         ustrc, ustrr, ustrwm, dwc, fwc, zoa = cr.m94( ub, omega, u_mag_zr, zr, phi_c, kb)
-
+        
+        data['ub'][i] = ub
+        data['u_mag_zr'][i] = u_mag_zr
+        data['zr'][i] = zr
+        data['kb'][i] = kb
         data['H'][i] = H
         data['k'][i] = k
         data['k_x'][i] = k*np.cos(angle_waves)
@@ -302,7 +310,7 @@ def calculate_stress(data):
         data['ustar_w'][i] = ustrwm
         data['delta_wc'][i] = dwc
         data['z0a'][i] = zoa
-        data['tau_b'][i] = ustrr*ustrr/rho
+        data['tau_b'][i] = ustrr*ustrr*rho
         data['phi_c'][i] = phi_c
     return data
 
@@ -382,7 +390,7 @@ def stress_worker(filename, fetch_model):
     wind_sat_tide_data['easting'] = x_0
     wind_sat_tide_data['northin'] = y_0
     wind_sat_tide_data['T'] = T
-    wind_sat_tide_data['a0'] = Hs
+    wind_sat_tide_data['a0'] = Hs/2
     wind_sat_tide_data['fetch'] = fetch
     
     indx2 = ~ np.isnan(Hs)
@@ -417,7 +425,7 @@ def sat_worker(filename):
     
     
 if __name__ == "__main__":
-    do_sat_merge = True
+    do_sat_merge = False
     do_stress_work = True
     do_build_fulldata = True
     
@@ -470,7 +478,7 @@ if __name__ == "__main__":
             print('grabbing: ' + stress_sat_directory+filename)
             with open(stress_sat_directory+filename,'rb') as f:
                 stress_sat_data = pickle.load(f)
-                indx = ~ (np.isnan(stress_sat_data['tau_b']) | np.isinf(stress_sat_data['tau_b']))
+                indx = ~ (np.isnan(stress_sat_data['tau_b']) )# | np.isinf(stress_sat_data['tau_b']))
                 for k in stress_sat_data.keys():
                     if not k in full_data.keys():
                         full_data[k] = np.array([])
