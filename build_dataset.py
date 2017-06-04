@@ -417,7 +417,7 @@ def sat_worker(filename):
     
     
 if __name__ == "__main__":
-    do_sat_merge = True
+    do_sat_merge = False
     do_stress_work = True
     do_build_fulldata = True
     
@@ -477,7 +477,7 @@ if __name__ == "__main__":
                     full_data[k] = np.append(full_data[k], stress_sat_data[k][indx])
                 full_data['date'] = np.append(full_data['date'],[datetime.strptime(filename[19:34],'%Y%m%d_%H%M%S')]*sum(indx))
                 f.close()
-            break
+       #     break
         print('Finished: Building full dataset', flush=True)
         
         full_data_filename = working_dir + sat + '_full_dataset.dk'       
