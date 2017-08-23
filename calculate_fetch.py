@@ -95,6 +95,8 @@ class FetchModel:
         :param fetch: fetch of target location
         :return: T, Hs (wave period, wave height)
         """
+        if u10 < 1e-4:
+                return [100], [0]
         ua = 0.71 * np.power(u10, 1.23)
         h0[h0 < 0.005] = np.nan*len([h0 < 0.005] )
         froude = g * h0 / ua / ua

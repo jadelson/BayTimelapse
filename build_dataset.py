@@ -133,7 +133,7 @@ def find_tide_data_by_time(test_time, path):
 
     u = u.transpose()
     v = v.transpose()
-    tide_data = {'lat': lat.flatten(),'lon':lon.flatten(), 'u':u.flatten(), 'v':v.flatten(), 'depth':depth.flatten(), 'eta':eta}
+    tide_data = {'lat': lat.flatten(),'lon':lon.flatten(), 'u':u.flatten(), 'v':v.flatten(), 'depth':depth.flatten(), 'eta':eta, 'face_node':face_nodes}
 
     return tide_data
 
@@ -170,7 +170,6 @@ def simple_sfbay_windterp(x_stations, y_stations, u_stations, v_stations, \
     lon6 = 5.49513e5 #ocean removal
     lat6 = 4.14842e6 #ocean removal
     lon7 = 6.05e5 #delta removal
-    
     lon_mont_min = 576030.82726326736 #Montezuma slough removal
     lon_mont_max = 583010.8610822059
     lat_mont_min = 4220561.5234375
@@ -247,8 +246,7 @@ def calculate_stress(data):
     data['ub'] = np.empty(m)
     data['u_mag_zr'] = np.empty(m)
     data['zr'] = np.empty(m)
-    data['kb'] = np.empty(m)
-             
+    data['kb'] = np.empty(m) 
     data['omega'] = 2*np.pi/data['T']
 
     depth = np.array(data['depth'])
